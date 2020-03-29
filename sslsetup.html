@@ -1,0 +1,71 @@
+How to install an SSL from Godaddy on your Node.js server with Amazon Web Services Ubuntu 18.04
+1. SSH into your server. (example: ssh –i nameofkey.pem ubuntu@111.11.11.11)
+2. Type: Cd /etc/nginx/ssl (change directory here)
+3. Type: openssl req -new -newkey rsa:2048 -nodes -keyout websitename.key -out websitename.csr (where websitename = name
+or whatever you want the name to be)
+4. Go through questions:
+a. Country Name (2 letter code) [AU]: US (for United States)
+b. State or Province Name (full name) [Some-State]:CA (for California)
+c. Locality Name (eg, city) []: Modesto (for City of Modesto)
+d. Organization Name (eg, company) [Internet Widgits Pty Ltd]: Company, Inc
+e. Organizational Unit Name (eg, section) []: websitename
+f. Common Name (e.g. server FQDN or YOUR name) []: websitename.com
+g. Email Address []: youremail@gmail.com
+h. Please enter the following 'extra' attributes to be sent with your certificate request: challenge password[]:
+securepassword
+5. Type: vim websitename.csr
+6. Copy all inside data including the ----- BEGIN CERTIFICATE REQUEST ----- and -----END CERTIFICATE REQUEST -----, not
+just the key inside.
+7. Purchase an SSL certificate from Godaddy in this case.
+8. Go to your products.
+9. Click the plus next to SSL Certificates.
+10. Click on Manage.
+11. Enter in your CSR and validate the CSR.
+12. Once CSR is validated and you are approved for HTTPS on YOUR website, Download the certificate by selecting Apache
+as server type and then hitting the download button on the download page.
+13. Get the files inside the zip file and move them into the destination of /etc/nginx/ssl (in this case I made a git
+repository with the 2 files inside and and cloned the repository at this destination)
+14. Once that’s complete you should have the .key, the .csr, and the 2 new files with a .crt extension
+15. Rename the first one from the folder to websitename.com.crt and the second one to intermediate.com (where
+websitename = your website name or name you want to use)
+16. Type: sudo su, to become a super user so you can run the next command. (You can also do this next step locally
+before pushing up to the server)
+17. Run the command: cat websitename.com.crt intermediate.crt > websitename.com.chained.crt (this will create a single
+chained certificate)
+18. Type: cd /etc/nginx/sites-available
+19. Type: vim name of file inside this folder such as website_name
+20. Put the following inside this area:
+a. Server {
+listen 80 default_server;
+listen [::]:80 default_server;
+server_name;
+return 301 https://$host$request_url;
+}
+(Note: This will redirect http requests to your https server)
+21. Next put this:
+a. server {
+listen 443 ssl;
+server_name websitename.com;
+ssl on;
+ssl_certificate /etc/ssl/websitename.com.chained.crt;
+ssl_certificate_key /etc/ssl/websitename.key;
+ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+ssl_prefer_server_ciphers on;
+ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+location / {
+proxy_pass http://{{PRIVATE_IP_ADDRESS}}:{{SERVER_PORT}};
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection 'upgrade';
+proxy_set_header Host $host;
+proxy_cache_bypass $http_upgrade;
+}
+}
+(Note: This will install the SSL certificate on your server.
+22a. Type: sudo service nginx restart (restarts the nginx server and applies changes to the file you just made).
+22b. If you get an error, run command given in error to check the error that occurred. Example, request_uri in 20a is
+spelled request_url instead.. this will throw and error and the server will not start.. has to be perfect.
+23. Check to see if your site is now using https:// and that http:// or websitename.com requests redirect to
+https://websitename.com.
+24. Lastly, make sure all links on your site (CDNs, etc) are https:// not http://, as no http:// links will work and
+could result in features not working.
